@@ -19,10 +19,14 @@ const Navbar = () => {
 
       {/* right side of navbar */}
       <aside className='hidden md:flex items-center gap-4 text-bold '>
-        <NavLink to="/" className='hover:underline'>Dashboard</NavLink>
-        <NavLink to="/add-image" className='hover:underline'>Add Image</NavLink>
-        <NavLink to="/database" className='hover:underline'>Database</NavLink>
-        <NavLink to="/about" className='hover:underline'>About</NavLink>
+        <NavLink to="/" className={({ isActive }) => 
+          `p-3 rounded-lg  transition-all ${isActive ? 'bg-white/20 font-bold border-white/50' : 'hover:bg-white/10'}`}>Dashboard</NavLink>
+        <NavLink to="/add-image" className={({ isActive }) => 
+          `p-3 rounded-lg  transition-all ${isActive ? 'bg-white/20 font-bold border-white/50' : 'hover:bg-white/10'}`}>Add Image</NavLink>
+        <NavLink to="/database" className={({ isActive }) => 
+          `p-3 rounded-lg  transition-all ${isActive ? 'bg-white/20 font-bold border-white/50' : 'hover:bg-white/10'}`}>Database</NavLink>
+        <NavLink to="/about" className={({ isActive }) => 
+          `p-3 rounded-lg  transition-all ${isActive ? 'bg-white/20 font-bold border-white/50' : 'hover:bg-white/10'}`}>About</NavLink>
       </aside>
     </div>
     {/* mobile view  */}
