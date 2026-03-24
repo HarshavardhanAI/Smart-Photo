@@ -3,7 +3,6 @@ import { MdOutlineFileUpload, MdDeleteOutline} from "react-icons/md";
 import { GiFireworkRocket } from "react-icons/gi";
 import Analysing from './Analysing';
 import ImagePreview from './ImagePreview';
-<<<<<<< HEAD
 import Results from './Results';
 
 const Dashboard = () => {
@@ -16,14 +15,6 @@ const Dashboard = () => {
       setIsAnalysing(false);
       setViewResults(true);
     }, 5000);
-=======
-const Dashboard = () => {
-  const [isAnalysing, setIsAnalysing] = useState(false);
-
-  const handleAnalyse = () => {
-    setIsAnalysing(true);
-    setTimeout(() => setIsAnalysing(false), 5000);
->>>>>>> a344e4f95d0109d5a037a24f60a208cea671355c
   };
 
   return (
@@ -37,17 +28,9 @@ const Dashboard = () => {
       </div>
 
       {/* Upload Section */}
-<<<<<<< HEAD
       {viewResults ? <Results /> : (  
         isAnalysing ? (<Analysing />): <ImagePreview handleAnalyse={handleAnalyse} setIsAnalysing={setIsAnalysing} />)
       }
-=======
-      {isAnalysing ? (
-        <Analysing />
-      ): 
-      // image preview section  
-      <ImagePreview handleAnalyse={handleAnalyse} setIsAnalysing={setIsAnalysing} />}
->>>>>>> a344e4f95d0109d5a037a24f60a208cea671355c
     </div>
   )
 }
