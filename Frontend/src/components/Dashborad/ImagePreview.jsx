@@ -28,7 +28,7 @@ const ImagePreview = ({ handleAnalyse, setIsAnalysing }) => {
                   Analyse Image
                 </button>
   
-                <button className='flex gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md' onClick={() => setImage(null)}>
+                <button className='flex gap-2 bg-[#58a6ff] hover:bg-[#58a6ff]/80 px-4 py-2 rounded-md' onClick={() => setImage(null)}>
                   <MdDeleteOutline className='h-6 w-6 text-white' onClick={() => setImage(null)} />
                   Remove Image
                 </button>

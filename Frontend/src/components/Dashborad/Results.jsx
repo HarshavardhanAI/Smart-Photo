@@ -56,12 +56,12 @@ const Results = () => {
           </table>
           <img src={image} className=' border border-[#8b949e] hidden sm:block sm:h-[50vh] w-auto' alt="Analysis Result" />
           </div>
-          <button onClick={() => setResults(!results) } className='bg-red-700'>change results</button>
+          <button onClick={() => setResults(!results) } className='bg-[#58a6ff] hover:bg-[#58a6ff]/80 text-white py-2 px-4 rounded-md'>change results</button>
         </div>
       ):(
         <div className='flex flex-col items-center justify-center gap-4 border-2 border-[#8b949e] rounded-md p-5 w-full bg-[#161b22] h-auto text-white'>
           <h1 className='text-2xl text-bolder '>No face are recognized . please  try adding face  to model.</h1>
-          <NavLink to='/dashboard/addface' className='bg-[#007acc] py-2 px-4 rounded-md'>Add Face</NavLink>
+          <NavLink to='/add-image' className='bg-[#58a6ff] hover:bg-[#58a6ff]/80 py-2 px-4 rounded-md'>Add Face</NavLink>
         </div>
       ))
  }
