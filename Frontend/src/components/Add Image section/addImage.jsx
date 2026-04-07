@@ -35,7 +35,6 @@ const AddImage = () => {
     const formData = new FormData();
     formData.append('image', image);
     formData.append('name', userName);
-    console.log(formData);
     const response = await fetch('http://localhost:5000/addperson', {
       method: 'POST',
       body: formData,
@@ -43,12 +42,17 @@ const AddImage = () => {
     const result = await response.json();
     console.log(result);
     setIsAnalysing(false);
-    
-    // // Simulate API call
-    // setTimeout(() => {
-    //    setIsAnalysing(false);
-    //    setIsSuccess(true); 
-    // }, 3000);
+    setIsSuccess(false);
+    setIsDuplicate(false);
+    setIsNoFace(false);
+
+    if (result.status === 'success') {
+      setIsSuccess(true);
+    } else if (result.status === "duplicate") {
+      setIsDuplicate(true);
+    } else if (result.status === "noface") {
+      setIsNoFace(true);
+    }
   }
   
   const removeImage = () => {

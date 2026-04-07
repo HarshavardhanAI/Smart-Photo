@@ -5,23 +5,47 @@ import numpy as np
 import os
 from retinaface import RetinaFace
 from keras_facenet import FaceNet
-import pinecone
+from pinecone import Pinecone, ServerlessSpec
 import uuid
 import cloudinary
 import cloudinary.uploader
+from dotenv import load_dotenv
 
+load_dotenv(dotenv_path=".env")
 app = Flask(__name__)
-CORS(app)
+CORS(
+    app,
+    resources={r"/*": {"origins": "http://localhost:5173"}},
+    supports_credentials=True
+)
 
 embedder = FaceNet()
 
-pinecone.init(api_key=os.getenv("PINECONE_API"), environment="us-east-1")
-index = pinecone.Index("face-recongition")
+pc = Pinecone(
+    api_key=os.getenv("PINECONE_API")
+)
 
+index_name = "face-recognition"
+
+# Create index if not exists
+existing_indexes = [i.name for i in pc.list_indexes()]
+
+if index_name not in existing_indexes:
+    pc.create_index(
+        name=index_name,
+        dimension=512,  # FaceNet embedding size
+        metric="cosine",
+        spec=ServerlessSpec(
+            cloud="aws",
+            region="us-east-1"
+        )
+    )
+
+index = pc.Index(index_name)
 cloudinary.config(
-    cloud_name="CLOUDINARY_CLOUD_NAME",
-    api_key="CLOUDINARY_API_KEY",
-    api_secret="CLOUDINARY_API_SECRET",
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
 )
 @app.route("/")
 def home():
@@ -72,6 +96,7 @@ def add_person():
             }
         )
         ])
+        
     return jsonify({
         "status":"sucess",
         "message":"image is uploaded to model"
