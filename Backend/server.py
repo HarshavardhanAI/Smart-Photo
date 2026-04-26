@@ -88,25 +88,31 @@ def align_face(img, left_eye, right_eye):
 def read_file(file):
     file_bytes = file.read()
     np_arr = np.frombuffer(file_bytes, np.uint8)
-    img = cv.imdecode(np_arr, cv.IMREAD_COLOR)
-    return img
+    img_bgr = cv.imdecode(np_arr, cv.IMREAD_COLOR)
+    img_rgb = cv.cvtColor(img_bgr, cv.COLOR_BGR2RGB)
+    return img_rgb, img_bgr
 
 def extract_face_embeddings(img,face):
     x1, y1, x2, y2 = face["facial_area"]
     h, w, _ = img.shape
-
+    face_w = x2-x1
+    face_h = y2-y1
+    print(f"[DEBUG] facial_area: {x1},{y1},{x2},{y2} | img size: {w}x{h}")
     # Step 1: Crop with margin
-    margin = 0.2
+    margin = 0.3 if (face_w < 80 or face_h < 80) else 0.2
     dx = int((x2 - x1) * margin)
     dy = int((y2 - y1) * margin)
     x1, y1 = max(0, x1 - dx), max(0, y1 - dy)
     x2, y2 = min(w, x2 + dx), min(h, y2 + dy)
     face_img = img[y1:y2, x1:x2]
+    print(f"[DEBUG] face crop shape: {face_img.shape}")  # 👈 is it (0,0,3)?
+
 
     # Step 2: Align using landmarks
     landmarks = face["landmarks"]
     left_eye  = (landmarks["left_eye"][0]  - x1, landmarks["left_eye"][1]  - y1)
     right_eye = (landmarks["right_eye"][0] - x1, landmarks["right_eye"][1] - y1)
+    print(f"[DEBUG] left_eye: {left_eye}, right_eye: {right_eye}") 
     face_img = align_face(face_img, left_eye, right_eye)
 
     if face_img.size == 0:
@@ -114,12 +120,13 @@ def extract_face_embeddings(img,face):
 
     # Step 3: Resize + normalize
     face_img = cv.resize(face_img, (160, 160))
-    face_img = cv.cvtColor(face_img, cv.COLOR_BGR2RGB).astype("float32")
+    face_img = face_img.astype("float32")
     face_img = np.expand_dims(face_img, axis=0)
 
     # Step 4: Embed + normalize
     embedding = embedder.embeddings(face_img)[0]
     norm = np.linalg.norm(embedding)
+    print(f"[DEBUG] embedding norm: {norm}") 
     if norm == 0:
         return None
 
@@ -159,8 +166,8 @@ def add_person():
     if not name or not file:
         return jsonify({"status": "error", "message": "name or image missing"}),400
 
-    img = read_file(file)
-    faces = RetinaFace.detect_faces(img)
+    img_rgb, img_bgr = read_file(file)
+    faces = RetinaFace.detect_faces(img_rgb)
 
     if faces is None or faces == {}:
         return jsonify({"status":"no face","message":"no face is detected"}),200
@@ -170,7 +177,7 @@ def add_person():
     face = list(faces.values())[0]
 
     if face["score"]>0.75:
-        embedding = extract_face_embeddings(img,face)
+        embedding = extract_face_embeddings(img_rgb,face)
         if embedding is None:
             return jsonify({"status": "error", "message": "invalid face crop"}), 400
         #duplicate logic part 
@@ -194,7 +201,7 @@ def add_person():
                     "matched_name" : match.get("metadata",{}).get("name")
                 }),200
         # upload to cloundinary 
-        _, buffer = cv.imencode(".jpg",img)
+        _, buffer = cv.imencode(".jpg",img_bgr)
         upload_result = cloudinary.uploader.upload(buffer.tobytes())
         image_url = upload_result["secure_url"]
         # upload to mongo db
@@ -231,37 +238,44 @@ def dashboard():
     file = request.files.get("image")
     if not file:
         return jsonify({"status": "error", "message": "image missing"}),400
-    img = read_file(file)
-    faces = RetinaFace.detect_faces(img)
+    img_rgb, img_bgr = read_file(file)
+    faces = RetinaFace.detect_faces(img_rgb)
     list_of_faces_found = []
     if faces is None or faces == {}:
         return jsonify({"status":"no_face","message":"no face is detected"}),200
     for face in faces.values():
-        if face["score"]>0.90:
-            embedding = extract_face_embeddings(img, face)
+        if face["score"]>0.75:
+            embedding = extract_face_embeddings(img_rgb, face)
             if embedding is None:
                 continue
             #querying pinecone 
             query_response = index.query(
                 vector=embedding.tolist(),
-                top_k=1,
+                top_k=3,
                 include_metadata=True,
             )
 
             matches = query_response.get("matches", [])
             if not matches:
                 continue
-            match = matches[0]
-            cosine_similarity = match.get("score", 0)
-            confidence = round(cosine_similarity * 100, 2)
-            threshold = 0.75
-            if  cosine_similarity>=threshold:
-                x1, y1, x2, y2 = face["facial_area"]
-                list_of_faces_found.append({
-                    "name":match.get("metadata",{}).get("name"),
-                    "confidence":confidence,
-                    "box": (x1,y1,x2,y2)
-                })
+            threshold = 0.65
+            candidates = []
+            for match in matches:
+                score = match.get("score",0)
+                if score>= threshold:
+                    candidates.append({
+                    "name": match.get("metadata", {}).get("name"),
+                    "image_url": match.get("metadata", {}).get("image_url"),
+                    "confidence": round(score * 100, 2),
+                    })
+            if not candidates:
+                continue
+            x1, y1, x2, y2 = face["facial_area"]
+            list_of_faces_found.append({
+                "box": (x1, y1, x2, y2),
+                "best_match": candidates[0]["name"],  
+                "candidates": candidates,           
+            })
     if len(list_of_faces_found) == 0:
         return jsonify({
         "status": "no_match",
@@ -272,17 +286,18 @@ def dashboard():
         person["color_bgr"] = colors[i]["bgr"]
         person["color_hex"] = colors[i]["hex"]
 
-    # Draw only colored boxes — no names on image
-    annotated_img = draw_face_box(img, list_of_faces_found)
+    # Draw only colored boxes 
+    annotated_img = draw_face_box(img_bgr, list_of_faces_found)
     _, buffer = cv.imencode(".jpg", annotated_img)
+    
     upload_result = cloudinary.uploader.upload(buffer.tobytes())
     image_url = upload_result["secure_url"]
     results = [
-        {
-            "name": p["name"],
-            "confidence": p["confidence"],
-            "color": p["color_hex"],
-        }
+    {
+        "best_match": p["best_match"],
+        "candidates": p["candidates"],
+        "color": p["color_hex"],
+    }
     for p in list_of_faces_found
     ]
     return jsonify({
@@ -335,4 +350,4 @@ def health():
     return jsonify({"status": "ok"}),200
 
 if __name__=="__main__":
-    app.run(debug=False, host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    app.run(debug=True, host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
